@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 export async function GET() {
-  const checks: Record<string, boolean | string> = {
+  const checks: Record<string, boolean | string | number> = {
     databaseUrl: Boolean(process.env.DATABASE_URL?.trim()),
     directUrl: Boolean(process.env.DIRECT_URL?.trim()),
     authSecret: Boolean(
