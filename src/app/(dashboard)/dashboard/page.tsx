@@ -7,7 +7,18 @@ export default async function DashboardPage() {
   const session = await getRequestSession();
   if (!session) redirect("/login");
 
-  const initial = await loadDashboardInitialMetrics(session);
+  let initial: Awaited<ReturnType<typeof loadDashboardInitialMetrics>>;
+  try {
+    initial = await loadDashboardInitialMetrics(session);
+  } catch (err) {
+    console.error("[dashboard] Falha ao carregar métricas iniciais:", err);
+    initial = {
+      metrics: null,
+      period: { from: "", to: "" },
+      kommoConfigured: false,
+      revalidate: false,
+    };
+  }
 
   return <DashboardPageClient initial={initial} />;
 }

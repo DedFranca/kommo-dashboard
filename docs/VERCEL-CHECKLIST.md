@@ -210,7 +210,20 @@ Atualize `AUTH_URL` e `NEXTAUTH_URL` com a URL real `https://seu-projeto.vercel.
 ### Login 500 / erro de banco
 
 - `DATABASE_URL` deve ser pooler **6543** com `?pgbouncer=true`
+- `DIRECT_URL` deve ser session pooler **5432** (obrigatório no schema Prisma)
 - `AUTH_URL` deve bater com a URL da Vercel
+- Teste: abra `https://SEU-APP.vercel.app/api/health/db` — deve retornar `"ok": true`
+
+### Application error (server-side exception)
+
+1. Abra `https://SEU-APP.vercel.app/api/health/db`
+2. Se `"db": false` → confira `DATABASE_URL` e `DIRECT_URL` na Vercel (senha, pooler, `?pgbouncer=true`)
+3. Se `"users": 0` → rode `npm run db:seed` local apontando para o Supabase
+4. Se `"authSecret": false` → adicione `AUTH_SECRET` na Vercel
+5. Se login funciona mas dashboard quebra → `APP_ENCRYPTION_KEY` na Vercel deve ser **igual** à usada no seed local (ou apague a integração Kommo no Supabase e use só `KOMMO_ACCESS_TOKEN` + `KOMMO_SUBDOMAIN` nas env vars)
+6. Vercel → Deployments → clique no deploy → **Logs** / **Functions** para ver o erro exato
+
+**Logins padrão (após seed):** `admin@kommo.local` / `Admin123!`
 
 ### Kommo lento na Vercel
 

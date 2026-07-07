@@ -17,10 +17,11 @@ export function CssHealthMonitor() {
   const [broken, setBroken] = useState(false);
 
   useEffect(() => {
+    if (process.env.NODE_ENV !== "development") return;
     if (!layoutCssHealthy()) setBroken(true);
   }, []);
 
-  if (!broken) return null;
+  if (process.env.NODE_ENV !== "development" || !broken) return null;
 
   return (
     <div className="fixed inset-x-0 top-0 z-[9999] border-b border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-md">

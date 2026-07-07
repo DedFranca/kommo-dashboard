@@ -73,46 +73,50 @@ type KommoIntegrationRow = NonNullable<
   Awaited<ReturnType<typeof prisma.kommoIntegration.findUnique>>
 >;
 
-async function hydrateRuntimeConfig(row: KommoIntegrationRow): Promise<KommoRuntimeConfig> {
+async function hydrateRuntimeConfig(row: KommoIntegrationRow): Promise<KommoRuntimeConfig | null> {
+  try {
+    let accessToken = decryptField(row.accessTokenEncrypted);
+    const expiresAt = row.tokenExpiresAt;
+    const needsRefresh =
+      expiresAt && expiresAt.getTime() < Date.now() + 60_000 && row.refreshTokenEncrypted;
 
-  let accessToken = decryptField(row.accessTokenEncrypted);
-  const expiresAt = row.tokenExpiresAt;
-  const needsRefresh =
-    expiresAt && expiresAt.getTime() < Date.now() + 60_000 && row.refreshTokenEncrypted;
-
-  if (needsRefresh && row.clientId && row.clientSecretEncrypted && row.refreshTokenEncrypted) {
-    const refreshed = await refreshKommoOAuthTokens({
-      subdomain: row.subdomain,
-      clientId: row.clientId,
-      clientSecret: decryptField(row.clientSecretEncrypted),
-      refreshToken: decryptField(row.refreshTokenEncrypted),
-    });
-    if (refreshed) {
-      accessToken = refreshed.accessToken;
-      await prisma.kommoIntegration.update({
-        where: { id: row.id },
-        data: {
-          accessTokenEncrypted: encryptField(refreshed.accessToken),
-          refreshTokenEncrypted: refreshed.refreshToken
-            ? encryptField(refreshed.refreshToken)
-            : row.refreshTokenEncrypted,
-          tokenExpiresAt: refreshed.expiresAt,
-        },
+    if (needsRefresh && row.clientId && row.clientSecretEncrypted && row.refreshTokenEncrypted) {
+      const refreshed = await refreshKommoOAuthTokens({
+        subdomain: row.subdomain,
+        clientId: row.clientId,
+        clientSecret: decryptField(row.clientSecretEncrypted),
+        refreshToken: decryptField(row.refreshTokenEncrypted),
       });
+      if (refreshed) {
+        accessToken = refreshed.accessToken;
+        await prisma.kommoIntegration.update({
+          where: { id: row.id },
+          data: {
+            accessTokenEncrypted: encryptField(refreshed.accessToken),
+            refreshTokenEncrypted: refreshed.refreshToken
+              ? encryptField(refreshed.refreshToken)
+              : row.refreshTokenEncrypted,
+            tokenExpiresAt: refreshed.expiresAt,
+          },
+        });
+      }
     }
-  }
 
-  return {
-    integrationId: row.id,
-    tenantId: row.tenantId,
-    subdomain: row.subdomain,
-    accessToken,
-    clientId: row.clientId,
-    clientSecret: row.clientSecretEncrypted ? decryptField(row.clientSecretEncrypted) : null,
-    refreshToken: row.refreshTokenEncrypted ? decryptField(row.refreshTokenEncrypted) : null,
-    tokenExpiresAt: row.tokenExpiresAt,
-    apiBaseUrl: getKommoBaseUrl(row.subdomain),
-  };
+    return {
+      integrationId: row.id,
+      tenantId: row.tenantId,
+      subdomain: row.subdomain,
+      accessToken,
+      clientId: row.clientId,
+      clientSecret: row.clientSecretEncrypted ? decryptField(row.clientSecretEncrypted) : null,
+      refreshToken: row.refreshTokenEncrypted ? decryptField(row.refreshTokenEncrypted) : null,
+      tokenExpiresAt: row.tokenExpiresAt,
+      apiBaseUrl: getKommoBaseUrl(row.subdomain),
+    };
+  } catch (err) {
+    console.error("[kommo] Integração inválida ou chave APP_ENCRYPTION_KEY incorreta:", row.id, err);
+    return null;
+  }
 }
 
 export async function createKommoIntegration(tenantId: string, input: KommoIntegrationInput) {

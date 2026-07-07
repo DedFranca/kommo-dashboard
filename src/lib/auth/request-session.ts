@@ -16,21 +16,26 @@ export async function getRequestSession(): Promise<AuthSessionPayload | null> {
   const jwtSession = await getAuthSession();
   if (!jwtSession) return null;
 
-  const user = await prisma.user.findUnique({
-    where: { id: jwtSession.userId },
-    select: { id: true, role: true, status: true, kommoIntegrationId: true },
-  });
-  if (!user) return null;
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: jwtSession.userId },
+      select: { id: true, role: true, status: true, kommoIntegrationId: true },
+    });
+    if (!user) return null;
 
-  const status = parseUserStatus(user.status);
-  if (status === "DISABLED") return null;
+    const status = parseUserStatus(user.status);
+    if (status === "DISABLED") return null;
 
-  return {
-    ...jwtSession,
-    role: parseUserRole(user.role),
-    status,
-    kommoIntegrationId: user.kommoIntegrationId ?? jwtSession.kommoIntegrationId ?? null,
-  };
+    return {
+      ...jwtSession,
+      role: parseUserRole(user.role),
+      status,
+      kommoIntegrationId: user.kommoIntegrationId ?? jwtSession.kommoIntegrationId ?? null,
+    };
+  } catch (err) {
+    console.error("[auth] Falha ao validar sessão no banco:", err);
+    return null;
+  }
 }
 
 export async function requireRequestSession(): Promise<AuthSessionPayload> {
