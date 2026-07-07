@@ -217,9 +217,10 @@ Atualize `AUTH_URL` e `NEXTAUTH_URL` com a URL real `https://seu-projeto.vercel.
 - Normal na 1ª carga (busca todos os leads)
 - Cache 20 min — recargas seguintes mais rápidas
 
-### Cron não roda
+### Cron não roda ou deploy bloqueia o cron
 
-- Cron jobs na Vercel exigem plano **Pro**
+- Plano **Hobby**: no máximo **1 execução por dia** (`0 9 * * *` no `vercel.json`)
+- Plano **Pro**: permite crons mais frequentes (ex.: a cada 6h)
 - Alternativa: chamar manualmente `/api/kommo/refresh?secret=SEU_SECRET`
 
 ---

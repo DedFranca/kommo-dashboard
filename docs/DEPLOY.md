@@ -130,7 +130,9 @@ Registro público (`/register`) está **desabilitado**.
 
 ## Cron Kommo (opcional)
 
-`vercel.json` agenda `/api/kommo/refresh` a cada 6h. Configure `CRON_SECRET` na Vercel — ela envia `Authorization: Bearer ${CRON_SECRET}` automaticamente.
+`vercel.json` agenda `/api/kommo/refresh` **1× por dia** (9:00 UTC ≈ 6h BRT) — limite do plano **Hobby**. Configure `CRON_SECRET` na Vercel; ela envia `Authorization: Bearer ${CRON_SECRET}` automaticamente.
+
+Para atualizar mais vezes, chame manualmente ou faça upgrade para Pro (cron a cada 6h).
 
 Ou chame manualmente:
 
