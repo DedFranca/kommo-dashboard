@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --surface: 255 255 255;
+  --surface-muted: 248 250 252;
+  --border: 226 232 240;
+}
+
+.dark {
+  --surface: 15 23 42;
+  --surface-muted: 30 41 59;
+  --border: 51 65 85;
+}
+
+body {
+  @apply bg-[#eef2f7] text-slate-900 antialiased;
+}
+
+.executive-dashboard {
+  @apply pb-8;
+}
+
+/* react-grid-layout / react-resizable */
+.react-grid-item.react-grid-placeholder {
+  @apply rounded-lg bg-indigo-500/20 dark:bg-indigo-400/20;
+}
+
+.react-resizable-handle::after {
+  @apply border-slate-400 dark:border-slate-500;
+}

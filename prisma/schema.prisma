@@ -1,0 +1,241 @@
+// SaaS multi-tenant — cada Tenant (cliente) possui integrações Kommo isoladas.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum UserRole {
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+enum PlatformRole {
+  SUPER_ADMIN
+  USER
+}
+
+enum TenantRole {
+  TENANT_ADMIN
+  EDITOR
+  VIEWER
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum LayoutKind {
+  DASHBOARD
+  ANALYTICS
+}
+
+model Tenant {
+  id        String       @id @default(cuid())
+  name      String
+  slug      String       @unique
+  status    TenantStatus @default(ACTIVE)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  memberships       TenantMembership[]
+  kommoIntegrations KommoIntegration[]
+  dashboards        Dashboard[]
+}
+
+model User {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  name         String?
+  passwordHash String
+  /// Papel global da plataforma (super admin)
+  platformRole PlatformRole @default(USER)
+  /// Papel global (fonte de verdade do RBAC): ADMIN | EDITOR | VIEWER
+  role         UserRole     @default(VIEWER)
+  /// Conta ativa ou desativada por um administrador
+  status       UserStatus   @default(ACTIVE)
+  /// Integração Kommo vinculada (usada principalmente por Visualizadores)
+  kommoIntegrationId String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  dashboard     Dashboard?
+  memberships   TenantMembership[]
+  refreshTokens RefreshToken[]
+  kommoIntegration KommoIntegration? @relation("UserKommoIntegration", fields: [kommoIntegrationId], references: [id], onDelete: SetNull)
+  ownedLayouts  Layout[]           @relation("LayoutOwner")
+  layoutShares  LayoutShare[]
+  auditLogs     AuditLog[]         @relation("AuditActor")
+
+  @@index([kommoIntegrationId])
+}
+
+model TenantMembership {
+  id        String     @id @default(cuid())
+  tenantId  String
+  userId    String
+  role      TenantRole @default(VIEWER)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId])
+  @@index([userId])
+}
+
+/// Múltiplas contas Kommo por tenant; uma ativa por vez (isActive).
+model KommoIntegration {
+  id                    String    @id @default(cuid())
+  tenantId              String
+  name                  String
+  subdomain             String
+  clientId              String?
+  clientSecretEncrypted String?
+  accessTokenEncrypted  String
+  refreshTokenEncrypted String?
+  tokenExpiresAt        DateTime?
+  accountId             Int?
+  isActive              Boolean   @default(false)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  /// Visualizadores que consomem esta integração no dashboard principal
+  assignedViewers User[] @relation("UserKommoIntegration")
+  /// Layouts compartilhados que usam esta integração como fonte
+  layouts         Layout[] @relation("LayoutDataSource")
+
+  @@index([tenantId])
+  @@index([tenantId, isActive])
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tenantId  String?
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Dashboard {
+  id            String   @id @default(cuid())
+  userId        String?  @unique
+  user          User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenantId      String?
+  tenant        Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name          String   @default("Meu dashboard")
+  layout        Json
+  dataSources   Json
+  settings      Json
+  layoutPresets Json
+  rawDatasets   RawDataset[]
+  analyticViews AnalyticView[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId])
+  @@index([tenantId])
+}
+
+model RawDataset {
+  id             String   @id @default(cuid())
+  dashboardId    String
+  dashboard      Dashboard @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
+  name           String
+  fileName       String?
+  sourceType     String
+  rawTable       Json
+  inferredSchema Json
+  semanticMap    Json
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  views          AnalyticView[]
+
+  @@index([dashboardId])
+}
+
+model AnalyticView {
+  id          String     @id @default(cuid())
+  dashboardId String
+  dashboard   Dashboard  @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
+  datasetId   String
+  dataset     RawDataset @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  widgetType  String
+  querySpec   Json
+  result      Json
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([dashboardId])
+  @@index([datasetId])
+}
+
+/// Layout compartilhável criado por Admin/Editor. A estrutura (widgets/grid e
+/// queries) fica em `config`; os dados são resolvidos pela integração definida
+/// em `dataSourceIntegrationId` (a fonte do criador) na hora de visualizar.
+model Layout {
+  id                     String      @id @default(cuid())
+  ownerId                String
+  owner                  User        @relation("LayoutOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  name                   String
+  description            String?
+  kind                   LayoutKind  @default(ANALYTICS)
+  config                 Json
+  /// Integração Kommo usada como fonte deste layout (opcional; pode usar datasets)
+  dataSourceIntegrationId String?
+  dataSourceIntegration   KommoIntegration? @relation("LayoutDataSource", fields: [dataSourceIntegrationId], references: [id], onDelete: SetNull)
+  createdAt              DateTime    @default(now())
+  updatedAt              DateTime    @updatedAt
+
+  shares LayoutShare[]
+
+  @@index([ownerId])
+  @@index([dataSourceIntegrationId])
+}
+
+/// Compartilhamento de um layout com um Visualizador (N:N entre Layout e User).
+model LayoutShare {
+  id        String   @id @default(cuid())
+  layoutId  String
+  layout    Layout   @relation(fields: [layoutId], references: [id], onDelete: Cascade)
+  viewerId  String
+  viewer    User     @relation(fields: [viewerId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([layoutId, viewerId])
+  @@index([viewerId])
+}
+
+/// Registro de ações administrativas relevantes (RBAC / auditoria).
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actor      User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  action     String
+  targetType String?
+  targetId   String?
+  metadata   Json
+  createdAt  DateTime @default(now())
+
+  @@index([actorId])
+  @@index([createdAt])
+}
