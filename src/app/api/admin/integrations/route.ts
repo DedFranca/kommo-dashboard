@@ -58,7 +58,7 @@ export async function POST(req: Request) {
   }
 
   const tenantId = await ensureDefaultTenantId();
-  const integration = await createKommoIntegration(tenantId, {
+  const result = await createKommoIntegration(tenantId, {
     name,
     subdomain,
     accessToken,
@@ -66,6 +66,12 @@ export async function POST(req: Request) {
     clientId,
     clientSecret,
   });
+
+  if (!result.ok) {
+    return NextResponse.json({ error: result.error }, { status: 400 });
+  }
+
+  const { integration } = result;
 
   await recordAudit({
     actorId: access.session.userId,

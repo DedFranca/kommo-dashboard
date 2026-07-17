@@ -1257,6 +1257,8 @@ export async function getKommoMetricsForUserRange(
   const filters = options?.filters ?? EMPTY_DASHBOARD_FILTERS;
   const filterKey = filtersCacheKey(filters);
   const cachedFiltersKey = (settings as DashboardSettings & { kommoMetricsCacheFilters?: string }).kommoMetricsCacheFilters ?? "";
+  const cachedIntegrationId = settings.kommoMetricsCacheIntegrationId ?? "";
+  const integrationKey = integrationId ?? "";
 
   const cachedRangeMatches =
     !options?.bustCache &&
@@ -1265,6 +1267,7 @@ export async function getKommoMetricsForUserRange(
     settings.kommoMetricsCachePeriodFrom === toISODate(range.from) &&
     settings.kommoMetricsCachePeriodTo === toISODate(range.to) &&
     cachedFiltersKey === filterKey &&
+    cachedIntegrationId === integrationKey &&
     isMetricCacheFresh(settings.kommoMetricsCacheUpdatedAt);
 
   if (cachedRangeMatches && settings.kommoMetricsCache) {
@@ -1318,6 +1321,7 @@ export async function getKommoMetricsForUserRange(
       kommoMetricsCachePeriodFrom: toISODate(range.from),
       kommoMetricsCachePeriodTo: toISODate(range.to),
       kommoMetricsCacheFilters: filterKey,
+      kommoMetricsCacheIntegrationId: integrationId ?? null,
     } as DashboardSettings);
   }
 

@@ -147,25 +147,21 @@ export function UsersAdminPanel({ currentUserId }: { currentUserId: string }) {
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    {user.role === "VIEWER" ? (
-                      <select
-                        className="rounded-md border border-border bg-transparent px-2 py-1 text-xs"
-                        value={user.kommoIntegrationId ?? ""}
-                        disabled={disabled}
-                        onChange={(e) =>
-                          patchUser(user.id, { kommoIntegrationId: e.target.value || null })
-                        }
-                      >
-                        <option value="">Sem integração</option>
-                        {integrations.map((i) => (
-                          <option key={i.id} value={i.id}>
-                            {i.name} ({i.subdomain})
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <span className="text-xs text-slate-400">—</span>
-                    )}
+                    <select
+                      className="rounded-md border border-border bg-transparent px-2 py-1 text-xs"
+                      value={user.kommoIntegrationId ?? ""}
+                      disabled={disabled}
+                      onChange={(e) =>
+                        patchUser(user.id, { kommoIntegrationId: e.target.value || null })
+                      }
+                    >
+                      <option value="">Sem integração</option>
+                      {integrations.map((i) => (
+                        <option key={i.id} value={i.id}>
+                          {i.name} ({i.subdomain})
+                        </option>
+                      ))}
+                    </select>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-2">
@@ -227,6 +223,10 @@ function CreateUserForm({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (!integrationId) {
+      onError("Selecione uma integração Kommo para esta conta.");
+      return;
+    }
     setSaving(true);
     onError(null);
     const res = await fetch("/api/admin/users", {
@@ -237,7 +237,7 @@ function CreateUserForm({
         name: name || undefined,
         password,
         role,
-        kommoIntegrationId: role === "VIEWER" ? integrationId || null : null,
+        kommoIntegrationId: integrationId,
       }),
     });
     setSaving(false);
@@ -298,25 +298,29 @@ function CreateUserForm({
           ))}
         </select>
       </label>
-      {role === "VIEWER" ? (
-        <label className="text-sm sm:col-span-2">
-          <span className="mb-1 block text-xs font-medium text-slate-500">
-            Integração Kommo (dados do dashboard deste visualizador)
+      <label className="text-sm sm:col-span-2">
+        <span className="mb-1 block text-xs font-medium text-slate-500">
+          Integração Kommo (obrigatória para Dashboard e Analytics)
+        </span>
+        <select
+          required
+          value={integrationId}
+          onChange={(e) => setIntegrationId(e.target.value)}
+          className="w-full rounded-md border border-border bg-transparent px-3 py-2"
+        >
+          <option value="">Selecione uma integração</option>
+          {integrations.map((i) => (
+            <option key={i.id} value={i.id}>
+              {i.name} ({i.subdomain})
+            </option>
+          ))}
+        </select>
+        {integrations.length === 0 ? (
+          <span className="mt-1 block text-xs text-amber-600 dark:text-amber-400">
+            Cadastre uma integração Kommo abaixo antes de criar a conta.
           </span>
-          <select
-            value={integrationId}
-            onChange={(e) => setIntegrationId(e.target.value)}
-            className="w-full rounded-md border border-border bg-transparent px-3 py-2"
-          >
-            <option value="">Sem integração</option>
-            {integrations.map((i) => (
-              <option key={i.id} value={i.id}>
-                {i.name} ({i.subdomain})
-              </option>
-            ))}
-          </select>
-        </label>
-      ) : null}
+        ) : null}
+      </label>
       <div className="sm:col-span-2">
         <Button type="submit" variant="primary" disabled={saving}>
           {saving ? "Criando…" : "Criar conta"}

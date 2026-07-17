@@ -95,7 +95,7 @@ export function AnalyticsPageClient() {
         className={`space-y-6 px-4 py-6 sm:px-6 lg:px-8 ${isRefreshing ? "pointer-events-none opacity-60" : ""}`}
       >
         <AnalyticsSection
-          title="Tempo para fechamento"
+          title="Tempo para fechamento" 
           subtitle="Negócios ganhos fechados no período — da criação ao fechamento"
         >
           {showSkeleton || !metrics ? (

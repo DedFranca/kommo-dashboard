@@ -10,7 +10,12 @@ export async function GET() {
 
   const configured = await isKommoConfiguredForSession(session);
   if (!configured) {
-    return NextResponse.json({ configured: false, ok: false, error: "Kommo não configurado" });
+    return NextResponse.json({
+      configured: false,
+      ok: false,
+      error:
+        "Nenhuma integração Kommo vinculada a esta conta. Peça a um administrador para atribuir uma.",
+    });
   }
 
   const health = await verifyKommoForSession(session);

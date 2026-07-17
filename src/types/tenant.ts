@@ -19,7 +19,7 @@ export type AuthSessionPayload = {
   tenantSlug: string;
   tenantRole: TenantRole;
   platformRole: PlatformRole;
-  /** Integração Kommo efetiva da sessão (atribuída ao Visualizador ou ativa do tenant). */
+  /** Integração Kommo vinculada ao usuário (obrigatória para Dashboard/Analytics). */
   kommoIntegrationId: string | null;
 };
 

@@ -10,7 +10,13 @@ export async function POST() {
   }
 
   if (!(await isKommoConfiguredForSession(session))) {
-    return NextResponse.json({ error: "Kommo não está configurado para esta conta." }, { status: 503 });
+    return NextResponse.json(
+      {
+        error:
+          "Nenhuma integração Kommo vinculada a esta conta. Peça a um administrador para atribuir uma.",
+      },
+      { status: 503 },
+    );
   }
 
   try {

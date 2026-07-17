@@ -3,7 +3,6 @@ import { canManageTenant, getRequestSession } from "@/lib/auth/request-session";
 import {
   createKommoIntegration,
   listKommoIntegrations,
-  setActiveKommoIntegration,
 } from "@/services/kommo-integration.service";
 import type { KommoIntegrationInput } from "@/types/tenant";
 
@@ -31,13 +30,13 @@ export async function POST(req: Request, { params }: Params) {
   if (!canAccessTenant(session, tenantId)) {
     return NextResponse.json({ error: "Acesso negado" }, { status: 403 });
   }
-  const body = (await req.json()) as KommoIntegrationInput & { setActive?: boolean };
+  const body = (await req.json()) as KommoIntegrationInput;
   if (!body.name?.trim() || !body.subdomain?.trim() || !body.accessToken?.trim()) {
     return NextResponse.json({ error: "Nome, subdomínio e access token são obrigatórios." }, { status: 400 });
   }
-  const created = await createKommoIntegration(tenantId, body);
-  if (body.setActive) {
-    await setActiveKommoIntegration(tenantId, created.id);
+  const result = await createKommoIntegration(tenantId, body);
+  if (!result.ok) {
+    return NextResponse.json({ error: result.error }, { status: 400 });
   }
-  return NextResponse.json({ integration: created }, { status: 201 });
+  return NextResponse.json({ integration: result.integration }, { status: 201 });
 }

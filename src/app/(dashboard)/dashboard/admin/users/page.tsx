@@ -17,8 +17,9 @@ export default async function AdminUsersPage() {
       <div>
         <h2 className="text-lg font-semibold">Gerenciar usuários</h2>
         <p className="text-sm text-slate-600 dark:text-slate-400">
-          Crie contas de Editor ou Visualizador, atribua a integração Kommo de cada visualizador e
-          controle papéis, status e exclusão. Apenas administradores têm acesso.
+          Crie contas de Editor ou Visualizador, atribua a integração Kommo de cada usuário (incluindo
+          Admin e Editor) e controle papéis, status e exclusão. Cada usuário precisa de uma integração
+          vinculada para ver dados no Dashboard e no Analytics.
         </p>
       </div>
       <UsersAdminPanel currentUserId={session.userId} />

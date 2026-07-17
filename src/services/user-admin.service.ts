@@ -86,7 +86,7 @@ export async function createManagedUser(
 
   const tenant = await ensureDefaultTenant();
   const passwordHash = await bcrypt.hash(input.password, 12);
-  const integrationId = input.role === "VIEWER" ? input.kommoIntegrationId ?? null : null;
+  const integrationId = input.kommoIntegrationId ?? null;
 
   const user = await prisma.user.create({
     data: {
@@ -141,14 +141,11 @@ export async function updateManagedUser(
   if (patch.name !== undefined) data.name = patch.name?.trim() || null;
   if (patch.role) data.role = patch.role;
   if (patch.status) data.status = patch.status;
-
-  const nextRole = patch.role ?? (current.role as UserRole);
-  if (nextRole !== "VIEWER") {
-    data.kommoIntegrationId = null;
-  } else if (patch.kommoIntegrationId !== undefined) {
+  if (patch.kommoIntegrationId !== undefined) {
     data.kommoIntegrationId = patch.kommoIntegrationId;
   }
 
+  const nextRole = patch.role ?? (current.role as UserRole);
   const user = await prisma.user.update({ where: { id }, data, select: SUMMARY_SELECT });
 
   if (patch.role && patch.role !== current.role) {
@@ -180,7 +177,6 @@ export async function updateManagedUser(
 
   if (
     patch.kommoIntegrationId !== undefined &&
-    nextRole === "VIEWER" &&
     patch.kommoIntegrationId !== current.kommoIntegrationId
   ) {
     await recordAudit({
@@ -188,7 +184,7 @@ export async function updateManagedUser(
       action: "user.assign_integration",
       targetType: "user",
       targetId: id,
-      metadata: { kommoIntegrationId: patch.kommoIntegrationId },
+      metadata: { kommoIntegrationId: patch.kommoIntegrationId, role: nextRole },
     });
   }
 

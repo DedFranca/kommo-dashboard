@@ -23,7 +23,8 @@ export async function GET(req: Request) {
   if (!kommoConfigured) {
     return NextResponse.json(
       {
-        error: "Kommo não está configurado. Defina KOMMO_SUBDOMAIN e KOMMO_ACCESS_TOKEN.",
+        error:
+          "Nenhuma integração Kommo vinculada a esta conta. Peça a um administrador para atribuir uma.",
         kommoConfigured: false,
         period,
       },

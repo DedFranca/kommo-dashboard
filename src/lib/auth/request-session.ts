@@ -26,16 +26,32 @@ export async function getRequestSession(): Promise<AuthSessionPayload | null> {
     const status = parseUserStatus(user.status);
     if (status === "DISABLED") return null;
 
+    const kommoIntegrationId = await resolveEffectiveIntegrationId(user.kommoIntegrationId);
+
     return {
       ...jwtSession,
       role: parseUserRole(user.role),
       status,
-      kommoIntegrationId: user.kommoIntegrationId ?? jwtSession.kommoIntegrationId ?? null,
+      kommoIntegrationId,
     };
   } catch (err) {
     console.error("[auth] Falha ao validar sessão no banco:", err);
     return null;
   }
+}
+
+/**
+ * Integração efetiva: apenas a vinculada ao usuário (se ainda existir).
+ * Sem fallback para integração "ativa" do tenant.
+ */
+async function resolveEffectiveIntegrationId(userKommoId: string | null): Promise<string | null> {
+  if (!userKommoId) return null;
+
+  const assigned = await prisma.kommoIntegration.findUnique({
+    where: { id: userKommoId },
+    select: { id: true },
+  });
+  return assigned?.id ?? null;
 }
 
 export async function requireRequestSession(): Promise<AuthSessionPayload> {

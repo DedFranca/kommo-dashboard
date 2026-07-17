@@ -5,7 +5,7 @@ import {
   type KommoClientConfig,
   verifyKommoConnectionWithConfig,
 } from "@/lib/kommo/client";
-import { getActiveKommoConfig, getKommoConfigById } from "@/services/kommo-integration.service";
+import { getKommoConfigById } from "@/services/kommo-integration.service";
 
 function runtimeToClientConfig(runtime: {
   subdomain: string;
@@ -19,17 +19,20 @@ function runtimeToClientConfig(runtime: {
   };
 }
 
+/**
+ * Resolve credenciais Kommo.
+ * Com integrationId: usa a integração do usuário.
+ * Sem integrationId: fallback legado .env (cron / setup antigo) — nunca "integração ativa" do tenant.
+ */
 export async function resolveKommoClientConfig(
-  tenantId: string,
+  _tenantId: string,
   integrationId?: string | null,
 ): Promise<KommoClientConfig | null> {
   if (integrationId) {
     const byId = await getKommoConfigById(integrationId);
     if (byId) return runtimeToClientConfig(byId);
+    return null;
   }
-
-  const tenantCfg = await getActiveKommoConfig(tenantId);
-  if (tenantCfg) return runtimeToClientConfig(tenantCfg);
 
   if (!isKommoConfigured()) return null;
 

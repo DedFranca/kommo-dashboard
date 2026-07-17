@@ -1,7 +1,14 @@
 import { decryptField, encryptField } from "@/lib/crypto/field-encryption";
-import { getKommoBaseUrl } from "@/lib/kommo/client";
+import {
+  getKommoBaseUrl,
+  verifyKommoConnectionWithConfig,
+} from "@/lib/kommo/client";
 import { prisma } from "@/lib/prisma";
 import type { KommoIntegrationInput, KommoIntegrationSummary } from "@/types/tenant";
+
+export type CreateKommoIntegrationResult =
+  | { ok: true; integration: Awaited<ReturnType<typeof prisma.kommoIntegration.create>> }
+  | { ok: false; error: string };
 
 export type KommoRuntimeConfig = {
   integrationId: string;
@@ -47,24 +54,15 @@ export async function listKommoIntegrations(tenantId: string): Promise<KommoInte
   return rows.map(toSummary);
 }
 
-/** Lista todas as integrações (modelo flat de organização única) para atribuição a Visualizadores. */
+/** Lista todas as integrações (modelo flat) para atribuição a usuários. */
 export async function listAllKommoIntegrations(): Promise<KommoIntegrationSummary[]> {
   const rows = await prisma.kommoIntegration.findMany({ orderBy: { createdAt: "desc" } });
   return rows.map(toSummary);
 }
 
-/** Resolve a configuração de runtime de uma integração específica (usada por Visualizadores). */
+/** Resolve a configuração de runtime de uma integração específica. */
 export async function getKommoConfigById(integrationId: string): Promise<KommoRuntimeConfig | null> {
   const row = await prisma.kommoIntegration.findUnique({ where: { id: integrationId } });
-  if (!row) return null;
-  return hydrateRuntimeConfig(row);
-}
-
-export async function getActiveKommoConfig(tenantId: string): Promise<KommoRuntimeConfig | null> {
-  const row = await prisma.kommoIntegration.findFirst({
-    where: { tenantId, isActive: true },
-    orderBy: { updatedAt: "desc" },
-  });
   if (!row) return null;
   return hydrateRuntimeConfig(row);
 }
@@ -119,42 +117,64 @@ async function hydrateRuntimeConfig(row: KommoIntegrationRow): Promise<KommoRunt
   }
 }
 
-export async function createKommoIntegration(tenantId: string, input: KommoIntegrationInput) {
+export async function createKommoIntegration(
+  tenantId: string,
+  input: KommoIntegrationInput,
+): Promise<CreateKommoIntegrationResult> {
   const subdomain = input.subdomain.trim().toLowerCase().replace(/\.kommo\.com.*/i, "");
-  const count = await prisma.kommoIntegration.count({ where: { tenantId } });
+  const accessToken = input.accessToken.trim();
+  const apiBaseUrl = getKommoBaseUrl(subdomain);
 
-  return prisma.kommoIntegration.create({
+  const verified = await verifyKommoConnectionWithConfig({
+    subdomain,
+    accessToken,
+    apiBaseUrl,
+  });
+  if (!verified.ok) {
+    return {
+      ok: false,
+      error: verified.error ?? "Não foi possível conectar à API Kommo. Verifique subdomínio e token.",
+    };
+  }
+
+  const integration = await prisma.kommoIntegration.create({
     data: {
       tenantId,
       name: input.name.trim(),
       subdomain,
       clientId: input.clientId?.trim() || null,
       clientSecretEncrypted: input.clientSecret ? encryptField(input.clientSecret) : null,
-      accessTokenEncrypted: encryptField(input.accessToken),
+      accessTokenEncrypted: encryptField(accessToken),
       refreshTokenEncrypted: input.refreshToken ? encryptField(input.refreshToken) : null,
       tokenExpiresAt: input.tokenExpiresAt ? new Date(input.tokenExpiresAt) : null,
-      isActive: count === 0,
+      accountId: verified.accountId ?? null,
+      isActive: false,
     },
   });
-}
 
-export async function setActiveKommoIntegration(tenantId: string, integrationId: string) {
-  await prisma.$transaction([
-    prisma.kommoIntegration.updateMany({
-      where: { tenantId },
-      data: { isActive: false },
-    }),
-    prisma.kommoIntegration.update({
-      where: { id: integrationId, tenantId },
-      data: { isActive: true },
-    }),
-  ]);
+  return { ok: true, integration };
 }
 
 export async function deleteKommoIntegration(tenantId: string, integrationId: string) {
-  return prisma.kommoIntegration.delete({
+  const row = await prisma.kommoIntegration.findFirst({
     where: { id: integrationId, tenantId },
+    select: { id: true },
   });
+  if (!row) throw new Error("Integração não encontrada");
+
+  await prisma.kommoIntegration.delete({ where: { id: integrationId } });
+  return row;
+}
+
+/** Remove integração pelo id (modelo flat). */
+export async function deleteKommoIntegrationById(integrationId: string) {
+  const row = await prisma.kommoIntegration.findUnique({
+    where: { id: integrationId },
+    select: { id: true, tenantId: true },
+  });
+  if (!row) throw new Error("Integração não encontrada");
+  await deleteKommoIntegration(row.tenantId, row.id);
+  return row;
 }
 
 async function refreshKommoOAuthTokens(input: {

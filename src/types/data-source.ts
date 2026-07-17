@@ -90,6 +90,8 @@ export type DashboardSettings = {
   kommoMetricsCachePeriodFrom?: string;
   kommoMetricsCachePeriodTo?: string;
   kommoMetricsCacheGrouping?: string;
+  /** Integração Kommo usada ao gravar o cache (invalida ao trocar conta). */
+  kommoMetricsCacheIntegrationId?: string | null;
   widgetPresetCache?: WidgetPresetMetrics;
   widgetPresetCacheUpdatedAt?: string;
   widgetPresetCachePeriodFrom?: string;

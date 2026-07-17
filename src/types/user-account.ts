@@ -16,7 +16,7 @@ export function parseUserStatus(value: unknown, fallback: UserStatus = "ACTIVE")
   return isUserStatus(value) ? value : fallback;
 }
 
-/** Integração Kommo disponível para vincular a um Visualizador. */
+/** Integração Kommo disponível para vincular a qualquer usuário. */
 export type AdminIntegrationOption = {
   id: string;
   name: string;

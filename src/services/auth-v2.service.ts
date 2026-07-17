@@ -40,13 +40,6 @@ async function resolveUserTenant(userId: string, tenantId?: string) {
   return memberships[0];
 }
 
-async function activeKommoForTenant(tenantId: string) {
-  return prisma.kommoIntegration.findFirst({
-    where: { tenantId, isActive: true },
-    orderBy: { updatedAt: "desc" },
-  });
-}
-
 function buildSessionPayload(
   user: {
     id: string;
@@ -73,17 +66,16 @@ function buildSessionPayload(
   };
 }
 
-/**
- * Integração efetiva da sessão: a vinculada ao usuário (Visualizador) tem
- * prioridade; caso contrário usa a integração ativa do tenant (Admin/Editor).
- */
+/** Integração efetiva da sessão: apenas a vinculada ao usuário. */
 async function resolveSessionIntegrationId(
   user: { kommoIntegrationId: string | null },
-  tenantId: string,
 ): Promise<string | null> {
-  if (user.kommoIntegrationId) return user.kommoIntegrationId;
-  const kommo = await activeKommoForTenant(tenantId);
-  return kommo?.id ?? null;
+  if (!user.kommoIntegrationId) return null;
+  const exists = await prisma.kommoIntegration.findUnique({
+    where: { id: user.kommoIntegrationId },
+    select: { id: true },
+  });
+  return exists?.id ?? null;
 }
 
 export async function loginWithCredentials(
@@ -127,7 +119,7 @@ export async function loginWithCredentials(
     return { ok: false, error: "Cliente suspenso. Contate o suporte." };
   }
 
-  const kommoId = await resolveSessionIntegrationId(user, membership.tenantId);
+  const kommoId = await resolveSessionIntegrationId(user);
   const session = buildSessionPayload(user, membership, kommoId);
   await issueAuthCookies(session);
   return { ok: true, session };
@@ -176,7 +168,7 @@ export async function refreshAuthSession(): Promise<LoginResult> {
   const membership = await resolveUserTenant(stored.userId, stored.tenantId ?? undefined);
   if (!membership) return { ok: false, error: "Usuário sem cliente associado." };
 
-  const kommoId = await resolveSessionIntegrationId(stored.user, membership.tenantId);
+  const kommoId = await resolveSessionIntegrationId(stored.user);
   const session = buildSessionPayload(stored.user, membership, kommoId);
 
   await prisma.refreshToken.delete({ where: { tokenHash } });

@@ -9,6 +9,7 @@ export function IntegrationsAdminSection() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -26,13 +27,35 @@ export function IntegrationsAdminSection() {
     void load();
   }, [load]);
 
+  async function remove(id: string, name: string) {
+    if (
+      !confirm(
+        `Excluir a integração "${name}"? Usuários vinculados ficarão sem dados Kommo até receberem outra atribuição.`,
+      )
+    ) {
+      return;
+    }
+    setBusyId(id);
+    setError(null);
+    const res = await fetch(`/api/admin/integrations/${id}`, { method: "DELETE" });
+    setBusyId(null);
+    if (!res.ok) {
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      setError(data.error ?? "Falha ao excluir integração.");
+      return;
+    }
+    await load();
+  }
+
   return (
     <section className="space-y-3">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <div>
           <h3 className="text-base font-semibold">Integrações Kommo</h3>
           <p className="text-sm text-slate-600 dark:text-slate-400">
-            Cadastre integrações para vincular a contas de Visualizador.
+            Cadastre contas Kommo. Cada integração só alimenta Dashboard e Analytics depois de
+            vinculada a um usuário (Admin, Editor ou Visualizador). Várias podem ser usadas ao
+            mesmo tempo por usuários diferentes.
           </p>
         </div>
         <Button type="button" variant="primary" onClick={() => setShowForm((v) => !v)}>
@@ -65,17 +88,30 @@ export function IntegrationsAdminSection() {
               <tr>
                 <th className="px-4 py-3 font-medium">Nome</th>
                 <th className="px-4 py-3 font-medium">Subdomínio</th>
-                <th className="px-4 py-3 font-medium">Ativa</th>
+                <th className="px-4 py-3 font-medium">Ações</th>
               </tr>
             </thead>
             <tbody>
-              {integrations.map((i) => (
-                <tr key={i.id} className="border-b border-border last:border-0">
-                  <td className="px-4 py-3 font-medium">{i.name}</td>
-                  <td className="px-4 py-3 text-slate-500">{i.subdomain}</td>
-                  <td className="px-4 py-3">{i.isActive ? "Sim" : "Não"}</td>
-                </tr>
-              ))}
+              {integrations.map((i) => {
+                const busy = busyId === i.id;
+                return (
+                  <tr key={i.id} className="border-b border-border last:border-0">
+                    <td className="px-4 py-3 font-medium">{i.name}</td>
+                    <td className="px-4 py-3 text-slate-500">{i.subdomain}</td>
+                    <td className="px-4 py-3">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="text-xs text-red-600"
+                        disabled={busy}
+                        onClick={() => remove(i.id, i.name)}
+                      >
+                        {busy ? "…" : "Excluir"}
+                      </Button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -148,9 +184,13 @@ function CreateIntegrationForm({
           className="w-full rounded-md border border-border bg-transparent px-3 py-2 font-mono text-xs"
         />
       </label>
+      <p className="text-xs text-slate-500 sm:col-span-2">
+        O token é validado na Kommo antes de salvar. Depois, vincule esta integração a um ou mais
+        usuários na tabela acima.
+      </p>
       <div className="sm:col-span-2">
         <Button type="submit" variant="primary" disabled={saving}>
-          {saving ? "Salvando…" : "Criar integração"}
+          {saving ? "Validando e salvando…" : "Criar integração"}
         </Button>
       </div>
     </form>

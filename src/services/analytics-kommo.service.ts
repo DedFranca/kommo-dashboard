@@ -9,8 +9,8 @@ import { getKommoLeadsContext } from "@/services/kommo.service";
 const ANALYTICS_CACHE_TTL_MS = 5 * 60 * 1000;
 const analyticsCache = new Map<string, { metrics: AnalyticsMetrics; fetchedAt: number }>();
 
-function cacheKey(userId: string, range: DateRange): string {
-  return `${userId}:${toISODate(range.from)}:${toISODate(range.to)}`;
+function cacheKey(userId: string, range: DateRange, integrationId?: string | null): string {
+  return `${userId}:${integrationId ?? "default"}:${toISODate(range.from)}:${toISODate(range.to)}`;
 }
 
 export async function getAnalyticsMetricsForUserRange(
@@ -19,14 +19,14 @@ export async function getAnalyticsMetricsForUserRange(
   range: DateRange,
   options?: { bustCache?: boolean; tenantId?: string; integrationId?: string | null },
 ): Promise<AnalyticsMetrics> {
-  const key = cacheKey(userId, range);
+  const integrationId = options?.integrationId;
+  const key = cacheKey(userId, range, integrationId);
   const cached = analyticsCache.get(key);
   if (!options?.bustCache && cached && Date.now() - cached.fetchedAt < ANALYTICS_CACHE_TTL_MS) {
     return cached.metrics;
   }
 
   const tenantId = options?.tenantId;
-  const integrationId = options?.integrationId;
   const configured = tenantId
     ? await isKommoConfiguredForTenant(tenantId, integrationId)
     : isKommoConfigured();
