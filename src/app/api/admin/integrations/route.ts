@@ -41,14 +41,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
   }
 
-  const { name, subdomain, accessToken, refreshToken, clientId, clientSecret } = body as {
-    name?: string;
-    subdomain?: string;
-    accessToken?: string;
-    refreshToken?: string;
-    clientId?: string;
-    clientSecret?: string;
-  };
+  const { name, subdomain, accessToken, refreshToken, clientId, clientSecret, assignToSelf } =
+    body as {
+      name?: string;
+      subdomain?: string;
+      accessToken?: string;
+      refreshToken?: string;
+      clientId?: string;
+      clientSecret?: string;
+      /** Se true (padrão), vincula a integração ao admin que criou quando ele ainda não tem uma. */
+      assignToSelf?: boolean;
+    };
 
   if (!name?.trim() || !subdomain?.trim() || !accessToken?.trim()) {
     return NextResponse.json(
@@ -72,13 +75,36 @@ export async function POST(req: Request) {
   }
 
   const { integration } = result;
+  let assignedToCreator = false;
+
+  const shouldAssign = assignToSelf !== false;
+  if (shouldAssign) {
+    const creator = await prisma.user.findUnique({
+      where: { id: access.session.userId },
+      select: { kommoIntegrationId: true },
+    });
+    if (creator && !creator.kommoIntegrationId) {
+      await prisma.user.update({
+        where: { id: access.session.userId },
+        data: { kommoIntegrationId: integration.id },
+      });
+      assignedToCreator = true;
+      await recordAudit({
+        actorId: access.session.userId,
+        action: "user.assign_integration",
+        targetType: "user",
+        targetId: access.session.userId,
+        metadata: { kommoIntegrationId: integration.id, reason: "auto_on_create" },
+      });
+    }
+  }
 
   await recordAudit({
     actorId: access.session.userId,
     action: "integration.create",
     targetType: "kommoIntegration",
     targetId: integration.id,
-    metadata: { name, subdomain },
+    metadata: { name, subdomain, assignedToCreator },
   });
 
   return NextResponse.json(
@@ -89,6 +115,7 @@ export async function POST(req: Request) {
         subdomain: integration.subdomain,
         isActive: integration.isActive,
       } satisfies AdminIntegrationOption,
+      assignedToCreator,
     },
     { status: 201 },
   );

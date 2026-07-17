@@ -33,7 +33,7 @@ export function useDashboardMetrics(initialRange?: DateRange, options?: Options)
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(initial?.metrics ?? null);
   const [kommoConfigured, setKommoConfigured] = useState(initial?.kommoConfigured ?? false);
   const [loading, setLoading] = useState(!initial?.metrics);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initial?.kommoError ?? null);
   const didInitialFetch = useRef(false);
 
   const fetchMetrics = useCallback(async (r: DateRange, f: DashboardFilters, bustCache = false, keepVisible = false) => {

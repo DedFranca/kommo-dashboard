@@ -16,6 +16,7 @@ export default async function DashboardPage() {
       metrics: null,
       period: { from: "", to: "" },
       kommoConfigured: false,
+      kommoError: "Não foi possível carregar o status da integração Kommo.",
       revalidate: false,
     };
   }

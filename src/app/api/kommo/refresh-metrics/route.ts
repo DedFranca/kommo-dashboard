@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getRequestSession } from "@/lib/auth/request-session";
-import { isKommoConfiguredForSession } from "@/lib/kommo/session-client";
+import { diagnoseKommoForSession } from "@/lib/kommo/session-client";
 import { refreshKommoMetricsForUser } from "@/services/kommo.service";
 
 export async function POST() {
@@ -9,12 +9,10 @@ export async function POST() {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
 
-  if (!(await isKommoConfiguredForSession(session))) {
+  const diagnosis = await diagnoseKommoForSession(session);
+  if (!diagnosis.ok) {
     return NextResponse.json(
-      {
-        error:
-          "Nenhuma integração Kommo vinculada a esta conta. Peça a um administrador para atribuir uma.",
-      },
+      { error: diagnosis.error, code: diagnosis.code },
       { status: 503 },
     );
   }

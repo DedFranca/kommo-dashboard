@@ -6,6 +6,7 @@ export type MetricsResponse = {
   source?: "kommo";
   kommoConfigured: boolean;
   error?: string;
+  code?: string;
 };
 
 export type { DashboardInitialData } from "@/lib/dashboard/initial-metrics";

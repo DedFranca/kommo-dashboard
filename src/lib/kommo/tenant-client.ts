@@ -5,7 +5,7 @@ import {
   type KommoClientConfig,
   verifyKommoConnectionWithConfig,
 } from "@/lib/kommo/client";
-import { getKommoConfigById } from "@/services/kommo-integration.service";
+import { loadKommoConfigById } from "@/services/kommo-integration.service";
 
 function runtimeToClientConfig(runtime: {
   subdomain: string;
@@ -21,16 +21,16 @@ function runtimeToClientConfig(runtime: {
 
 /**
  * Resolve credenciais Kommo.
- * Com integrationId: usa a integração do usuário.
- * Sem integrationId: fallback legado .env (cron / setup antigo) — nunca "integração ativa" do tenant.
+ * Com integrationId: usa a integração do usuário (sem fallback silencioso).
+ * Sem integrationId: fallback legado .env (cron / setup antigo).
  */
 export async function resolveKommoClientConfig(
   _tenantId: string,
   integrationId?: string | null,
 ): Promise<KommoClientConfig | null> {
   if (integrationId) {
-    const byId = await getKommoConfigById(integrationId);
-    if (byId) return runtimeToClientConfig(byId);
+    const loaded = await loadKommoConfigById(integrationId);
+    if (loaded.ok) return runtimeToClientConfig(loaded.config);
     return null;
   }
 
@@ -72,6 +72,13 @@ export async function verifyKommoForTenant(tenantId: string, integrationId?: str
   const tenantCfg = await resolveKommoClientConfig(tenantId, integrationId);
   if (tenantCfg) {
     return verifyKommoConnectionWithConfig(tenantCfg);
+  }
+  if (integrationId) {
+    return {
+      ok: false as const,
+      error:
+        "Não foi possível carregar as credenciais da integração vinculada (token ilegível ou integração removida).",
+    };
   }
   const { verifyKommoConnection } = await import("@/lib/kommo/client");
   return verifyKommoConnection();

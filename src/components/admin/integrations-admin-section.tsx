@@ -10,6 +10,7 @@ export function IntegrationsAdminSection() {
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [tokenEditId, setTokenEditId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -53,9 +54,9 @@ export function IntegrationsAdminSection() {
         <div>
           <h3 className="text-base font-semibold">Integrações Kommo</h3>
           <p className="text-sm text-slate-600 dark:text-slate-400">
-            Cadastre contas Kommo. Cada integração só alimenta Dashboard e Analytics depois de
-            vinculada a um usuário (Admin, Editor ou Visualizador). Várias podem ser usadas ao
-            mesmo tempo por usuários diferentes.
+            Cadastre contas Kommo e vincule cada uma a usuários. Use a mesma{" "}
+            <code className="text-xs">APP_ENCRYPTION_KEY</code> em local e produção — se mudar, use
+            “Atualizar token” aqui.
           </p>
         </div>
         <Button type="button" variant="primary" onClick={() => setShowForm((v) => !v)}>
@@ -99,15 +100,37 @@ export function IntegrationsAdminSection() {
                     <td className="px-4 py-3 font-medium">{i.name}</td>
                     <td className="px-4 py-3 text-slate-500">{i.subdomain}</td>
                     <td className="px-4 py-3">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="text-xs text-red-600"
-                        disabled={busy}
-                        onClick={() => remove(i.id, i.name)}
-                      >
-                        {busy ? "…" : "Excluir"}
-                      </Button>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="text-xs"
+                          disabled={busy}
+                          onClick={() => setTokenEditId((cur) => (cur === i.id ? null : i.id))}
+                        >
+                          Atualizar token
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="text-xs text-red-600"
+                          disabled={busy}
+                          onClick={() => remove(i.id, i.name)}
+                        >
+                          {busy ? "…" : "Excluir"}
+                        </Button>
+                      </div>
+                      {tokenEditId === i.id ? (
+                        <UpdateTokenForm
+                          integrationId={i.id}
+                          onDone={() => {
+                            setTokenEditId(null);
+                            void load();
+                          }}
+                          onError={setError}
+                          onBusy={setBusyId}
+                        />
+                      ) : null}
                     </td>
                   </tr>
                 );
@@ -117,6 +140,59 @@ export function IntegrationsAdminSection() {
         </div>
       )}
     </section>
+  );
+}
+
+function UpdateTokenForm({
+  integrationId,
+  onDone,
+  onError,
+  onBusy,
+}: {
+  integrationId: string;
+  onDone: () => void;
+  onError: (msg: string | null) => void;
+  onBusy: (id: string | null) => void;
+}) {
+  const [accessToken, setAccessToken] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    onBusy(integrationId);
+    onError(null);
+    const res = await fetch(`/api/admin/integrations/${integrationId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ accessToken }),
+    });
+    setSaving(false);
+    onBusy(null);
+    if (!res.ok) {
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      onError(data.error ?? "Falha ao atualizar token.");
+      return;
+    }
+    onDone();
+  }
+
+  return (
+    <form onSubmit={submit} className="mt-3 space-y-2 rounded-lg border border-border bg-slate-50 p-3 dark:bg-slate-900/40">
+      <label className="block text-xs">
+        <span className="mb-1 block font-medium text-slate-500">Novo access token</span>
+        <textarea
+          required
+          value={accessToken}
+          onChange={(e) => setAccessToken(e.target.value)}
+          rows={3}
+          className="w-full rounded-md border border-border bg-transparent px-3 py-2 font-mono text-xs"
+        />
+      </label>
+      <Button type="submit" variant="primary" className="text-xs" disabled={saving}>
+        {saving ? "Validando…" : "Salvar token"}
+      </Button>
+    </form>
   );
 }
 
@@ -185,8 +261,8 @@ function CreateIntegrationForm({
         />
       </label>
       <p className="text-xs text-slate-500 sm:col-span-2">
-        O token é validado na Kommo antes de salvar. Depois, vincule esta integração a um ou mais
-        usuários na tabela acima.
+        O token é validado na Kommo e cifado com <code>APP_ENCRYPTION_KEY</code>. Se você ainda não
+        tiver integração vinculada, esta conta de admin é associada automaticamente.
       </p>
       <div className="sm:col-span-2">
         <Button type="submit" variant="primary" disabled={saving}>

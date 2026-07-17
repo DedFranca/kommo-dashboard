@@ -1,5 +1,5 @@
 import { getDefaultDateRange, parseISODate, toISODate } from "@/lib/date-range";
-import { isKommoConfiguredForSession } from "@/lib/kommo/session-client";
+import { diagnoseKommoForSession } from "@/lib/kommo/session-client";
 import { getDashboardExtras } from "@/services/data-source.service";
 import { readStoredMetricsCache } from "@/services/kommo.service";
 import type { AuthSessionPayload } from "@/types/tenant";
@@ -9,6 +9,8 @@ export type DashboardInitialData = {
   metrics: DashboardMetrics | null;
   period: { from: string; to: string };
   kommoConfigured: boolean;
+  /** Motivo quando Kommo não está utilizável (sem vínculo / token ilegível). */
+  kommoError?: string | null;
   /** Cache existe mas passou do TTL — cliente deve revalidar em background. */
   revalidate: boolean;
 };
@@ -24,7 +26,7 @@ function isMetricCacheFresh(updatedAt?: string): boolean {
 
 /** Carrega métricas do cache persistido no servidor (sem chamar Kommo). */
 export async function loadDashboardInitialMetrics(session: AuthSessionPayload): Promise<DashboardInitialData> {
-  const kommoConfigured = await isKommoConfiguredForSession(session);
+  const diagnosis = await diagnoseKommoForSession(session);
   const { settings } = await getDashboardExtras(session.userId);
   const defaultRange = getDefaultDateRange();
 
@@ -33,17 +35,26 @@ export async function loadDashboardInitialMetrics(session: AuthSessionPayload): 
   const to = parseISODate(settings.kommoMetricsCachePeriodTo ?? settings.periodTo ?? undefined) ?? defaultRange.to;
   const period = { from: toISODate(from), to: toISODate(to) };
 
-  if (!kommoConfigured) {
-    return { metrics: null, period, kommoConfigured: false, revalidate: false };
+  if (!diagnosis.ok) {
+    return {
+      metrics: null,
+      period,
+      kommoConfigured: false,
+      kommoError: diagnosis.error,
+      revalidate: false,
+    };
   }
 
-  const cached = readStoredMetricsCache(settings, { from, to });
+  const cachedIntegrationId = settings.kommoMetricsCacheIntegrationId ?? "";
+  const cacheMatchesIntegration = cachedIntegrationId === (diagnosis.integrationId ?? "");
+  const cached = cacheMatchesIntegration ? readStoredMetricsCache(settings, { from, to }) : null;
   const fresh = cached ? isMetricCacheFresh(settings.kommoMetricsCacheUpdatedAt) : false;
 
   return {
     metrics: cached,
     period,
     kommoConfigured: true,
+    kommoError: null,
     revalidate: Boolean(cached && !fresh),
   };
 }

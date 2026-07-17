@@ -41,8 +41,10 @@ export function AnalyticsPageClient() {
           <div className="mb-3">Nenhuma métrica disponível.</div>
         )}
         {!kommoConfigured ? (
-          <p className="mb-4 text-xs text-slate-400">
-            Configure as variáveis KOMMO_SUBDOMAIN e KOMMO_ACCESS_TOKEN no servidor.
+          <p className="mb-4 max-w-md text-xs text-slate-400">
+            Vincule uma integração Kommo à sua conta em Usuários. Se já estiver vinculada, confira se{" "}
+            <code className="text-[11px]">APP_ENCRYPTION_KEY</code> é a mesma em todos os ambientes e
+            recadastre o access token da integração.
           </p>
         ) : null}
         <Button onClick={() => refetch()} type="button">

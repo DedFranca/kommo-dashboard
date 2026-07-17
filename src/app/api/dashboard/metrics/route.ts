@@ -3,7 +3,7 @@ import { getRequestSession } from "@/lib/auth/request-session";
 import { getDefaultDateRange, parseISODate, toISODate } from "@/lib/date-range";
 import { getDashboardExtras, saveDashboardSettings } from "@/services/data-source.service";
 import { getKommoMetricsForUserRange } from "@/services/kommo.service";
-import { isKommoConfiguredForSession } from "@/lib/kommo/session-client";
+import { diagnoseKommoForSession } from "@/lib/kommo/session-client";
 import { EMPTY_DASHBOARD_FILTERS, type DashboardFilters } from "@/types/dashboard-filters";
 
 function parseIdList(value: string | null): number[] {
@@ -52,14 +52,14 @@ export async function GET(req: Request) {
     });
   }
 
-  const kommoConfigured = await isKommoConfiguredForSession(session);
+  const diagnosis = await diagnoseKommoForSession(session);
   const period = { from: toISODate(from), to: toISODate(to) };
 
-  if (!kommoConfigured) {
+  if (!diagnosis.ok) {
     return NextResponse.json(
       {
-        error:
-          "Nenhuma integração Kommo vinculada a esta conta. Peça a um administrador para atribuir uma.",
+        error: diagnosis.error,
+        code: diagnosis.code,
         kommoConfigured: false,
         period,
       },
@@ -72,7 +72,12 @@ export async function GET(req: Request) {
       session.userId,
       extras.settings,
       { from, to },
-      { bustCache, filters, tenantId: session.tenantId, integrationId: session.kommoIntegrationId },
+      {
+        bustCache,
+        filters,
+        tenantId: session.tenantId,
+        integrationId: diagnosis.integrationId,
+      },
     );
 
     return NextResponse.json({

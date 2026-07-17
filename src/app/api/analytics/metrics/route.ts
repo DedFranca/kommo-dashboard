@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getRequestSession } from "@/lib/auth/request-session";
-import { isKommoConfiguredForSession } from "@/lib/kommo/session-client";
+import { diagnoseKommoForSession } from "@/lib/kommo/session-client";
 import {
   analyticsPeriodPayload,
   getAnalyticsMetricsForUserRange,
@@ -18,13 +18,13 @@ export async function GET(req: Request) {
   const bustCache = searchParams.get("refresh") === "1";
   const range = resolveAnalyticsRange(searchParams.get("from"), searchParams.get("to"));
   const period = analyticsPeriodPayload(range);
-  const kommoConfigured = await isKommoConfiguredForSession(session);
+  const diagnosis = await diagnoseKommoForSession(session);
 
-  if (!kommoConfigured) {
+  if (!diagnosis.ok) {
     return NextResponse.json(
       {
-        error:
-          "Nenhuma integração Kommo vinculada a esta conta. Peça a um administrador para atribuir uma.",
+        error: diagnosis.error,
+        code: diagnosis.code,
         kommoConfigured: false,
         period,
       },
@@ -38,7 +38,7 @@ export async function GET(req: Request) {
       session.userId,
       extras.settings,
       range,
-      { bustCache, tenantId: session.tenantId, integrationId: session.kommoIntegrationId },
+      { bustCache, tenantId: session.tenantId, integrationId: diagnosis.integrationId },
     );
 
     return NextResponse.json({

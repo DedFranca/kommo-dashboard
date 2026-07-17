@@ -11,6 +11,12 @@ export async function GET() {
         process.env.NEXTAUTH_SECRET?.trim(),
     ),
     appEncryptionKey: Boolean(process.env.APP_ENCRYPTION_KEY?.trim()),
+    encryptionSource:
+      process.env.APP_ENCRYPTION_KEY?.trim()
+        ? "APP_ENCRYPTION_KEY"
+        : process.env.AUTH_SECRET?.trim() || process.env.JWT_SECRET?.trim()
+          ? "AUTH_SECRET"
+          : "insecure_fallback",
   };
 
   try {
